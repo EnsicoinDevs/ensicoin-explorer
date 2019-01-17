@@ -20,8 +20,6 @@ export default new Vuex.Store({
   actions: {
     loadBlocks ({ commit }, { page, rowsPerPage }) {
       return new Promise((resolve, reject) => {
-        console.log(page, rowsPerPage)
-
         axios.get('/api/blocks', {
           params: {
             page: page - 1,

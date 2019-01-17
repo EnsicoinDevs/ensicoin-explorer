@@ -2,34 +2,28 @@ package main
 
 import (
 	"context"
-	"flag"
 	pb "github.com/EnsicoinDevs/ensicoin-explorer/api/rpc"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	bolt "go.etcd.io/bbolt"
 	"google.golang.org/grpc"
+	"os"
 	"strconv"
 	"time"
 )
 
-var (
-	serverAddr = flag.String("server_addr", "127.0.0.1:4225", "The server address in the format of host:port")
-)
-
 func main() {
-	flag.Parse()
-
 	var opts []grpc.DialOption
 
 	opts = append(opts, grpc.WithInsecure())
 
-	conn, err := grpc.Dial(*serverAddr, opts...)
+	conn, err := grpc.Dial(os.Getenv("API_NODE"), opts...)
 	if err != nil {
 		log.WithError(err).Fatal("unable to dial with the grpc server")
 	}
 	defer conn.Close()
 
-	db, err := dbOpen("ensicoin_explorer.db")
+	db, err := dbOpen("db/ensicoin_explorer.db")
 	if err != nil {
 		log.WithError(err).Fatal("unable to open the db")
 	}
