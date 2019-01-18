@@ -11,8 +11,8 @@
         <h4>Summary</h4>
       </v-card-title>
       <v-divider></v-divider>
-      <v-layout row>
-        <v-flex xs3>
+      <v-layout row wrap>
+        <v-flex sm12 md3 lg3 xl3>
           <v-list dense>
             <v-list-tile>
               <v-list-tile-content class="body-2">Height</v-list-tile-content>
@@ -39,9 +39,7 @@
           </v-list>
         </v-flex>
 
-        <v-divider vertical></v-divider>
-
-        <v-flex xs3>
+        <v-flex sm12 md3 lg3 xl3>
           <v-list dense>
             <v-list-tile>
               <v-list-tile-content class="body-2">Bits</v-list-tile-content>
@@ -68,9 +66,7 @@
           </v-list>
         </v-flex>
 
-        <v-divider vertical></v-divider>
-
-        <v-flex xs6>
+        <v-flex sm12 md6 lg6 xl6>
           <v-list dense>
             <v-list-tile>
               <v-list-tile-content class="body-2">Block Hash</v-list-tile-content>
@@ -98,6 +94,41 @@
         </v-flex>
       </v-layout>
     </v-card>
+
+    <v-layout
+      v-if="block !== null"
+      column
+      wrap
+    >
+      <v-flex xs12>
+        <v-card
+          v-for="tx in block.txs"
+          :key="tx.hash"
+          class="mt-3"
+        >
+          <v-card-title>
+            <h4>{{ tx.hash }}</h4>
+          </v-card-title>
+          <v-divider></v-divider>
+          <v-layout row fill-height class="pa-3">
+            <v-flex md5 v-if="tx.inputs === null || tx.inputs.length === 0">
+              <v-chip>
+                Coinbase
+              </v-chip>
+            </v-flex>
+
+            <v-flex md7>
+              <v-chip
+                v-for="output in tx.outputs"
+                :key="output.script"
+              >
+                {{ output.value }}
+              </v-chip>
+            </v-flex>
+          </v-layout>
+        </v-card>
+      </v-flex>
+    </v-layout>
   </div>
 </template>
 
