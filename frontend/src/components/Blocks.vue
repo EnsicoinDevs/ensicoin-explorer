@@ -38,7 +38,9 @@ export default {
   data () {
     return {
       loading: true,
-      pagination: {},
+      pagination: {
+        rowsPerPage: 10
+      },
       headers: [
         {
           text: 'Height',

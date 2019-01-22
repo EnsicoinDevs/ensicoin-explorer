@@ -1,8 +1,15 @@
-FROM node:current-alpine
+FROM alpine:latest
 
-RUN npm install -g http-server
+RUN apk add --update nginx nodejs npm
 
-WORKDIR /app
+RUN mkdir -p /tmp/nginx/app
+RUN mkdir -p /var/log/nginx
+RUN mkdir -p /var/www/html
+
+COPY nginx_config/nginx.conf /etc/nginx/nginx.conf
+COPY nginx_config/default.conf /etc/nginx/conf.d/default.conf
+
+WORKDIR /tmp/nginx/app
 
 COPY package*.json ./
 
@@ -12,5 +19,7 @@ COPY . .
 
 RUN npm run build
 
-EXPOSE 8080
-CMD [ "http-server", "dist" ]
+RUN cp -r dist/* /var/www/html
+
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
