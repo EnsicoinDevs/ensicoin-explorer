@@ -112,18 +112,28 @@
           <v-divider></v-divider>
           <v-layout row fill-height class="pa-3">
             <v-flex md5 v-if="tx.inputs === null || tx.inputs.length === 0">
-              <v-chip>
+              <v-chip color="light-blue" text-color="white">
                 Coinbase
               </v-chip>
             </v-flex>
 
             <v-flex md7>
-              <v-chip
-                v-for="output in tx.outputs"
-                :key="output.script"
-              >
-                {{ output.value }}
-              </v-chip>
+              <v-list>
+                <v-list-tile
+                  v-for="output in tx.outputs"
+                  :key="output.script"
+                >
+                  <v-list-tile-content>
+                    {{ output.script | parseScript }}
+                  </v-list-tile-content>
+
+                  <v-list-tile-action>
+                    <v-chip>
+                      {{ output.value }}
+                    </v-chip>
+                  </v-list-tile-action>
+                </v-list-tile>
+              </v-list>
             </v-flex>
           </v-layout>
         </v-card>
@@ -163,6 +173,11 @@ export default {
       axios.get('/api/blocks/' + this.hash).then(res => {
         this.block = res.data.block
       })
+    }
+  },
+  filters: {
+    parseScript (value) {
+      return atob(value).split('').map(e => e.charCodeAt(0).toString(16)).join(' ')
     }
   },
   computed: {

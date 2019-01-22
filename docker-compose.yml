@@ -12,7 +12,7 @@ services:
   frontend:
     build: ./frontend
     ports:
-      - "4271:8080"
+      - "4271:80"
 
 volumes:
   explorer-db:
