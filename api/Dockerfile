@@ -7,7 +7,7 @@ WORKDIR /go/src/github.com/EnsicoinDevs/ensicoin-explorer/api
 
 COPY . .
 
-RUN dep ensure -vendor-only
+RUN go mod download
 
 RUN go install
 
