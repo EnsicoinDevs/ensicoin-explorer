@@ -1,16 +1,16 @@
-FROM golang:latest
+FROM golang:latest AS build-env
 
-RUN go get -u github.com/golang/dep/...
-
-RUN mkdir -p /go/src/github.com/EnsicoinDevs/ensicoin-explorer/api/db
-WORKDIR /go/src/github.com/EnsicoinDevs/ensicoin-explorer/api
-
+WORKDIR /src
 COPY . .
 
-RUN go mod download
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -mod=vendor -o explorer
 
-RUN go install
 
-ENTRYPOINT /go/bin/api
+FROM alpine
+
+WORKDIR /app
+COPY --from=build-env /src/explorer .
 
 EXPOSE 8080
+
+CMD [ "./explorer" ]
