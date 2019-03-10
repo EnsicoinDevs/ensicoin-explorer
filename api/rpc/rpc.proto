@@ -2,9 +2,15 @@ syntax = "proto3";
 
 package rpc;
 
-service Blockchain {
+service Node {
   rpc GetBlock (GetBlockRequest) returns (GetBlockReply) {}
   rpc GetBestBlockHash (GetBestBlockHashRequest) returns (GetBestBlockHashReply) {}
+  rpc PublishTx (PublishTxRequest) returns (PublishTxReply) {}
+  rpc ListenIncomingTxs (ListenIncomingTxsRequest) returns (stream TxWithBlock) {}
+}
+
+message Error {
+  uint32 code = 1;
 }
 
 message Block {
@@ -55,4 +61,21 @@ message GetBestBlockHashRequest {}
 
 message GetBestBlockHashReply {
   string hash = 1;
+}
+
+message PublishTxRequest {
+  bytes tx = 1;
+}
+
+message PublishTxReply {
+  Error error = 1;
+  string hash = 2;
+}
+
+message ListenIncomingTxsRequest {
+}
+
+message TxWithBlock {
+  Tx tx = 1;
+  Block block = 2;
 }
