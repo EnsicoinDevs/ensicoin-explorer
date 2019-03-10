@@ -28,7 +28,7 @@ func main() {
 		log.WithError(err).Fatal("unable to open the db")
 	}
 
-	client := pb.NewBlockchainClient(conn)
+	client := pb.NewNodeClient(conn)
 
 	r := gin.Default()
 
@@ -107,7 +107,7 @@ func main() {
 	dbClose(db)
 }
 
-func startBlocksTicker(client pb.BlockchainClient, db *bolt.DB) chan struct{} {
+func startBlocksTicker(client pb.NodeClient, db *bolt.DB) chan struct{} {
 	ticker := time.NewTicker(30 * time.Second)
 
 	quit := make(chan struct{})
@@ -129,7 +129,7 @@ func startBlocksTicker(client pb.BlockchainClient, db *bolt.DB) chan struct{} {
 	return quit
 }
 
-func getNewBlocks(client pb.BlockchainClient, db *bolt.DB) {
+func getNewBlocks(client pb.NodeClient, db *bolt.DB) {
 	currentBestBlockHash, err := dbGetBestBlockHash(db)
 	if _, ok := err.(*NotFoundError); !ok && err != nil {
 		log.WithError(err).Fatal("unable to get the current best block hash from the db")
@@ -170,7 +170,7 @@ func getNewBlocks(client pb.BlockchainClient, db *bolt.DB) {
 	}
 }
 
-func rpcGetAndConvertBlock(client pb.BlockchainClient, hash string) *Block {
+func rpcGetAndConvertBlock(client pb.NodeClient, hash string) *Block {
 	blockReply := rpcGetBlock(client, &pb.GetBlockRequest{
 		Hash: hash,
 	})
@@ -221,7 +221,7 @@ func rpcGetAndConvertBlock(client pb.BlockchainClient, hash string) *Block {
 	return mBlock
 }
 
-func rpcGetBlock(client pb.BlockchainClient, request *pb.GetBlockRequest) *pb.GetBlockReply {
+func rpcGetBlock(client pb.NodeClient, request *pb.GetBlockRequest) *pb.GetBlockReply {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	reply, err := client.GetBlock(ctx, request)
@@ -232,7 +232,7 @@ func rpcGetBlock(client pb.BlockchainClient, request *pb.GetBlockRequest) *pb.Ge
 	return reply
 }
 
-func rpcGetBestBlockHash(client pb.BlockchainClient, request *pb.GetBestBlockHashRequest) *pb.GetBestBlockHashReply {
+func rpcGetBestBlockHash(client pb.NodeClient, request *pb.GetBestBlockHashRequest) *pb.GetBestBlockHashReply {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	reply, err := client.GetBestBlockHash(ctx, request)
