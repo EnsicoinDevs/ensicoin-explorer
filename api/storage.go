@@ -1,224 +1,152 @@
 package main
 
 import (
-	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	bolt "go.etcd.io/bbolt"
+	"strconv"
 )
 
-const (
-	BLOCKS_BUCKET  = "blocks"
-	TXS_BUCKET     = "txs"
-	STATS_BUCKET   = "stats"
-	HEIGHTS_BUCKET = "heights"
+var (
+	blocksBucket        = []byte("blocks")
+	txsBucket           = []byte("txs")
+	blockToTxsBucket    = []byte("blockToTxs")
+	heightToBlockBucket = []byte("heightToBlock")
 )
 
-type NotFoundError struct {
+type Storage struct {
+	db *bolt.DB
 }
 
-func (err *NotFoundError) Error() string {
-	return "not found"
+func NewStorage() *Storage {
+	return &Storage{}
 }
 
-func dbOpen(path string) (*bolt.DB, error) {
-	db, err := bolt.Open(path, 0666, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	err = db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists([]byte(BLOCKS_BUCKET))
-		if err != nil {
-			return err
-		}
-
-		_, err = tx.CreateBucketIfNotExists([]byte(TXS_BUCKET))
-		if err != nil {
-			return err
-		}
-
-		_, err = tx.CreateBucketIfNotExists([]byte(STATS_BUCKET))
-		if err != nil {
-
-		}
-
-		_, err = tx.CreateBucketIfNotExists([]byte(HEIGHTS_BUCKET))
-
-		return err
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return db, nil
+func (s *Storage) Open() (err error) {
+	s.db, err = bolt.Open("db/database.db", 0666, nil)
+	return
 }
 
-func dbStoreBestBlockHash(db *bolt.DB, hash string) error {
-	return db.Update(func(tx *bolt.Tx) error {
-		statsBucket := tx.Bucket([]byte(STATS_BUCKET))
-
-		return statsBucket.Put([]byte("bestBlockHash"), []byte(hash))
-	})
+func (s *Storage) Close() error {
+	return s.db.Close()
 }
 
-func dbGetBestBlockHash(db *bolt.DB) (hash string, err error) {
-	err = db.View(func(tx *bolt.Tx) error {
-		statsBucket := tx.Bucket([]byte(STATS_BUCKET))
-
-		hashBytes := statsBucket.Get([]byte("bestBlockHash"))
-		if hashBytes == nil {
-			return new(NotFoundError)
-		}
-
-		hash = string(hashBytes)
-
-		return nil
-	})
-
-	return hash, err
-}
-
-func dbStoreBlock(db *bolt.DB, block *Block) error {
-	err := db.Update(func(tx *bolt.Tx) error {
-		blocksBucket := tx.Bucket([]byte(BLOCKS_BUCKET))
-		txsBucket := tx.Bucket([]byte(TXS_BUCKET))
-
-		liteBlock := &LiteBlock{
-			Header: block.Header,
-		}
-
-		for _, tx := range block.Txs {
-			liteBlock.Txs = append(liteBlock.Txs, tx.Hash)
-
-			txBytes, err := json.Marshal(tx)
-			if err != nil {
-				return err
-			}
-
-			err = txsBucket.Put([]byte(tx.Hash), txBytes)
-			if err != nil {
-				return err
-			}
-		}
-
-		liteBlockBytes, err := json.Marshal(liteBlock)
-		if err != nil {
-			return err
-		}
-
-		return blocksBucket.Put([]byte(block.Header.Hash), liteBlockBytes)
-	})
+func (s *Storage) StoreBlock(block *Block) error {
+	blockBytes, err := json.Marshal(block)
 	if err != nil {
 		return err
 	}
 
-	return dbStoreHeight(db, block.Header.Height, block.Header.Hash)
-}
-
-func dbGetTx(db *bolt.DB, hash string) (*Tx, error) {
-	tx := new(Tx)
-
-	err := db.View(func(btx *bolt.Tx) error {
-		txsBucket := btx.Bucket([]byte(TXS_BUCKET))
-
-		txBytes := txsBucket.Get([]byte(hash))
-		if txBytes == nil {
-			return new(NotFoundError)
+	return s.db.Update(func(tx *bolt.Tx) error {
+		if err := tx.Bucket(blocksBucket).Put([]byte(block.Hash), blockBytes); err != nil {
+			return err
 		}
 
-		return json.Unmarshal(txBytes, &tx)
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return tx, nil
-}
-
-func dbGetBlock(db *bolt.DB, hash string) (*Block, error) {
-	block := new(Block)
-
-	liteBlock, err := dbGetLiteBlock(db, hash)
-	if err != nil {
-		return nil, err
-	}
-
-	block.Header = liteBlock.Header
-
-	for _, txHash := range liteBlock.Txs {
-		tx, err := dbGetTx(db, txHash)
-		if err != nil {
-			return nil, err
-		}
-
-		block.Txs = append(block.Txs, tx)
-	}
-
-	return block, nil
-}
-
-func dbGetLiteBlock(db *bolt.DB, hash string) (*LiteBlock, error) {
-	liteBlock := new(LiteBlock)
-
-	err := db.View(func(tx *bolt.Tx) error {
-		blocksBucket := tx.Bucket([]byte(BLOCKS_BUCKET))
-
-		liteBlockBytes := blocksBucket.Get([]byte(hash))
-		if liteBlockBytes == nil {
-			return new(NotFoundError)
-		}
-
-		return json.Unmarshal(liteBlockBytes, &liteBlock)
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return liteBlock, nil
-}
-
-func dbHasBlock(db *bolt.DB, hash string) (bool, error) {
-	_, err := dbGetLiteBlock(db, hash)
-	if _, ok := err.(*NotFoundError); ok {
-		return false, nil
-	} else if err != nil {
-		return false, err
-	}
-
-	return true, nil
-}
-
-func dbStoreHeight(db *bolt.DB, height uint32, hash string) error {
-	return db.Update(func(tx *bolt.Tx) error {
-		heightsBucket := tx.Bucket([]byte(HEIGHTS_BUCKET))
-
-		b := make([]byte, 4)
-		binary.BigEndian.PutUint32(b, height)
-
-		return heightsBucket.Put(b, []byte(hash))
+		return tx.Bucket(heightToBlockBucket).Put([]byte(strconv.Itoa(int(block.Height))), []byte(block.Hash))
 	})
 }
 
-func dbGetHeight(db *bolt.DB, height uint32) (hash string, err error) {
-	err = db.View(func(tx *bolt.Tx) error {
-		heightsBucket := tx.Bucket([]byte(HEIGHTS_BUCKET))
-
-		b := make([]byte, 4)
-		binary.BigEndian.PutUint32(b, height)
-
-		hashBytes := heightsBucket.Get(b)
-		if hashBytes == nil {
-			return new(NotFoundError)
+func (s *Storage) FindBlockByHash(hash string) (block *Block, err error) {
+	err = s.db.View(func(tx *bolt.Tx) error {
+		blockBytes := tx.Bucket(blocksBucket).Get([]byte(hash))
+		if blockBytes == nil {
+			return fmt.Errorf("block not found")
 		}
 
-		hash = string(hashBytes)
-
-		return nil
+		return json.Unmarshal(blockBytes, &block)
 	})
 
 	return
 }
 
-func dbClose(db *bolt.DB) error {
-	return db.Close()
+func (s *Storage) FindBlockByHeight(height uint32) (block *Block, err error) {
+	var blockHash string
+
+	if err := s.db.View(func(tx *bolt.Tx) error {
+		blockHashBytes := tx.Bucket(heightToBlockBucket).Get([]byte(strconv.Itoa(int(height))))
+		if blockHashBytes == nil {
+			return fmt.Errorf("block not found")
+		}
+
+		blockHash = string(blockHashBytes)
+
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return s.FindBlockByHash(blockHash)
+}
+
+func (s *Storage) StoreTx(tx *Tx) error {
+	txBytes, err := json.Marshal(tx)
+	if err != nil {
+		return err
+	}
+
+	return s.db.Update(func(btx *bolt.Tx) error {
+		return btx.Bucket(txsBucket).Put([]byte(tx.Hash), txBytes)
+	})
+}
+
+func (s *Storage) StoreTxs(blockHash string, txs []*Tx) error {
+	var txHashes []string
+
+	for _, tx := range txs {
+		if err := s.StoreTx(tx); err != nil {
+			return err
+		}
+
+		txHashes = append(txHashes, tx.Hash)
+	}
+
+	txHashesBytes, err := json.Marshal(txHashes)
+	if err != nil {
+		return err
+	}
+
+	return s.db.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket(blockToTxsBucket).Put([]byte(blockHash), txHashesBytes)
+	})
+}
+
+func (s *Storage) FindTxs(blockHash string) ([]*Tx, error) {
+	var txHashes []string
+
+	if err := s.db.View(func(tx *bolt.Tx) error {
+		txHashesBytes := tx.Bucket(blockToTxsBucket).Get([]byte(blockHash))
+		if txHashesBytes == nil {
+			return fmt.Errorf("block not found")
+		}
+
+		return json.Unmarshal(txHashesBytes, &txHashes)
+	}); err != nil {
+		return nil, err
+	}
+
+	var txs []*Tx
+
+	for _, hash := range txHashes {
+		tx, err := s.FindTxByHash(hash)
+		if err != nil {
+			return nil, err
+		}
+
+		txs = append(txs, tx)
+	}
+
+	return txs, nil
+}
+
+func (s *Storage) FindTxByHash(hash string) (tx *Tx, err error) {
+	err = s.db.View(func(tx *bolt.Tx) error {
+		txBytes := tx.Bucket(txsBucket).Get([]byte(hash))
+		if txBytes == nil {
+			return fmt.Errorf("tx not found")
+		}
+
+		return json.Unmarshal(txBytes, &tx)
+	})
+
+	return
 }
