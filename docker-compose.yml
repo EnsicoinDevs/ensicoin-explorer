@@ -5,10 +5,10 @@ services:
     ports:
       - "4270:8080"
     volumes:
-      - explorer-db:/go/src/github.com/EnsicoinDevs/ensicoin-explorer/api/db
+      - explorer-db:/app/db
     environment:
       - GIN_MODE=release
-      - API_NODE=172.17.0.1:4225
+      - API_NODE=172.0.0.1:4225
   frontend:
     build: ./frontend
     ports:

@@ -8,6 +8,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -mod=vendor -o explo
 
 FROM alpine
 
+RUN mkdir -p /app/db/
 WORKDIR /app
 COPY --from=build-env /src/explorer .
 
