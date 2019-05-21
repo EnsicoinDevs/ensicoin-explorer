@@ -8,6 +8,7 @@ import (
 )
 
 var (
+	statsBucket         = []byte("stats")
 	blocksBucket        = []byte("blocks")
 	txsBucket           = []byte("txs")
 	blockToTxsBucket    = []byte("blockToTxs")
@@ -15,20 +16,77 @@ var (
 )
 
 type Storage struct {
-	db *bolt.DB
+	path string
+	db   *bolt.DB
 }
 
-func NewStorage() *Storage {
-	return &Storage{}
+func NewStorage(path string) *Storage {
+	return &Storage{
+		path: path,
+	}
 }
 
 func (s *Storage) Open() (err error) {
-	s.db, err = bolt.Open("db/database.db", 0666, nil)
-	return
+	s.db, err = bolt.Open(s.path, 0600, nil)
+	if err != nil {
+		return err
+	}
+
+	return s.bootstrap()
 }
 
 func (s *Storage) Close() error {
 	return s.db.Close()
+}
+
+func (s *Storage) bootstrap() error {
+	return s.db.Update(func(tx *bolt.Tx) error {
+		if _, err := tx.CreateBucketIfNotExists(statsBucket); err != nil {
+			return err
+		}
+
+		if _, err := tx.CreateBucketIfNotExists(blocksBucket); err != nil {
+			return err
+		}
+
+		if _, err := tx.CreateBucketIfNotExists(txsBucket); err != nil {
+			return err
+		}
+
+		if _, err := tx.CreateBucketIfNotExists(blockToTxsBucket); err != nil {
+			return err
+		}
+		if _, err := tx.CreateBucketIfNotExists(heightToBlockBucket); err != nil {
+			return err
+		}
+
+		return nil
+	})
+}
+
+func (s *Storage) StoreBestBlockHash(hash string) error {
+	return s.db.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket(statsBucket).Put([]byte("bestBlockHash"), []byte(hash))
+	})
+}
+
+func (s *Storage) FindBestBlockHash() (string, error) {
+	var hash string
+
+	if err := s.db.View(func(tx *bolt.Tx) error {
+		bestBlockHashBytes := tx.Bucket(statsBucket).Get([]byte("bestBlockHash"))
+		if bestBlockHashBytes == nil {
+			return fmt.Errorf("best block hash not found")
+		}
+
+		hash = string(bestBlockHashBytes)
+
+		return nil
+	}); err != nil {
+		return "", err
+	}
+
+	return hash, nil
 }
 
 func (s *Storage) StoreBlock(block *Block) error {
@@ -44,6 +102,20 @@ func (s *Storage) StoreBlock(block *Block) error {
 
 		return tx.Bucket(heightToBlockBucket).Put([]byte(strconv.Itoa(int(block.Height))), []byte(block.Hash))
 	})
+}
+
+func (s *Storage) HasBlock(hash string) (bool, error) {
+	var exist bool
+
+	if err := s.db.View(func(tx *bolt.Tx) error {
+		exist = tx.Bucket(blocksBucket).Get([]byte(hash)) != nil
+
+		return nil
+	}); err != nil {
+		return false, err
+	}
+
+	return exist, nil
 }
 
 func (s *Storage) FindBlockByHash(hash string) (block *Block, err error) {
