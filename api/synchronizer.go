@@ -74,7 +74,9 @@ func (s *Synchronizer) startHandler() {
 			log.Fatal("fatal error receiving a block")
 		}
 
-		return bestBlockHash
+		if err = s.synchronizeTo(utils.NewHash(bestBlockHash.GetHash()).String()); err != nil {
+			log.WithError(err).Fatal("fatal error synchronizing")
+		}
 	}
 }
 

@@ -8,6 +8,7 @@ require (
 	github.com/golang/protobuf v1.3.1
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/cobra v0.0.3
+	github.com/toorop/gin-logrus v0.0.0-20190324082946-8887861896bb
 	go.etcd.io/bbolt v1.3.2
 	golang.org/x/net v0.0.0-20190514140710-3ec191127204
 	google.golang.org/grpc v1.20.1
